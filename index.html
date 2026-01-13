@@ -14,25 +14,24 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
     }
     .card {
       background: #121a2b;
-      padding: 22px;
+      padding: 20px;
       border-radius: 16px;
       width: 100%;
-      max-width: 360px;
+      max-width: 440px;
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      text-align: center;
     }
-    h2 { margin-top: 0; }
+    h2 { text-align: center; margin-top: 0; }
     button {
       width: 100%;
-      padding: 14px;
-      margin-top: 10px;
-      border-radius: 12px;
+      padding: 12px;
+      margin-top: 8px;
+      border-radius: 10px;
       border: none;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       background: #1e2a45;
       color: white;
@@ -40,10 +39,28 @@
     }
     button.active { background: #1f6b3a; }
     button:disabled { opacity: .6; }
-    .status {
+    .status { margin-top: 8px; font-size: 14px; }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
       margin-top: 12px;
-      font-size: 14px;
-      opacity: .9;
+    }
+    .day {
+      background: #0e1526;
+      border-radius: 8px;
+      padding: 6px;
+      text-align: center;
+      font-size: 12px;
+    }
+    .done { background: #1f6b3a; }
+    .punishment {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 10px;
+      background: #241c1c;
+      font-weight: bold;
+      text-align: center;
     }
   </style>
 </head>
@@ -52,35 +69,29 @@
 <div class="card">
   <h2>Gym Motiv 💪</h2>
 
-  <!-- USER SELECT -->
   <button id="massBtn">I am Mass</button>
   <button id="gBtn">I am G</button>
-  <div class="status" id="userStatus">Not logged in</div>
+  <div class="status" id="userStatus"></div>
 
-  <!-- ACTIONS -->
   <button id="sentBtn" disabled>✅ I have sent (I went)</button>
   <button id="receivedBtn" disabled>✅ I have received (partner went)</button>
 
   <div class="status" id="todayStatus"></div>
-  <div class="status"><strong>This week:</strong> <span id="weekCount">0</span> / 4</div>
+
+  <h3>This Week</h3>
+  <div class="calendar" id="calendar"></div>
+
+  <div class="punishment" id="punishmentBox"></div>
 </div>
 
 <script type="module">
-  console.log("JS loaded ✅");
-
-  /* ---------- FIREBASE IMPORTS ---------- */
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
   import {
-    getFirestore,
-    doc,
-    setDoc,
-    updateDoc,
-    onSnapshot,
-    collection,
-    getDocs
+    getFirestore, doc, setDoc, updateDoc,
+    collection, getDocs, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-  /* ---------- FIREBASE CONFIG ---------- */
+  /* ---------- FIREBASE ---------- */
   const firebaseConfig = {
     apiKey: "AIzaSyC2XOpkk8J5GgXPphkrJyFXrcgYwta_Dg4",
     authDomain: "gymmotiv-e58d6.firebaseapp.com",
@@ -92,24 +103,31 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  console.log("Firebase connected ✅");
 
   /* ---------- DATE HELPERS ---------- */
-  function todayKey() {
-    return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  function dateKey(d) {
+    return d.toLocaleDateString("en-CA", { timeZone: "Europe/London" });
   }
 
-  function weekKey() {
+  function isoWeekKey(d = new Date()) {
+    const date = new Date(d);
+    date.setHours(0,0,0,0);
+    date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+    const week1 = new Date(date.getFullYear(), 0, 4);
+    return date.getFullYear() + "-W" +
+      String(1 + Math.round(((date - week1) / 86400000 - 3 + (week1.getDay()+6)%7) / 7)).padStart(2,"0");
+  }
+
+  function mondayOfWeek() {
     const d = new Date();
-    d.setHours(0,0,0,0);
-    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-    const week1 = new Date(d.getFullYear(),0,4);
-    return d.getFullYear() + "-W" +
-      String(1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay()+6)%7) / 7)).padStart(2,"0");
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    return d;
   }
 
-  const WEEK = weekKey();
-  const TODAY = todayKey();
+  const WEEK = isoWeekKey();
+  const TODAY = dateKey(new Date());
+  const weekRef = collection(db, "weeks", WEEK, "days");
   const dayRef = doc(db, "weeks", WEEK, "days", TODAY);
 
   await setDoc(dayRef, {
@@ -119,27 +137,24 @@
     gReceived: false
   }, { merge: true });
 
-  /* ---------- UI ---------- */
+  /* ---------- USER ---------- */
   let currentUser = localStorage.getItem("currentUser");
 
   const massBtn = document.getElementById("massBtn");
   const gBtn = document.getElementById("gBtn");
   const sentBtn = document.getElementById("sentBtn");
   const receivedBtn = document.getElementById("receivedBtn");
-  const userStatus = document.getElementById("userStatus");
   const todayStatus = document.getElementById("todayStatus");
-  const weekCount = document.getElementById("weekCount");
+  const calendarEl = document.getElementById("calendar");
+  const punishmentBox = document.getElementById("punishmentBox");
+  const userStatus = document.getElementById("userStatus");
 
   function renderUser() {
     massBtn.classList.toggle("active", currentUser === "mass");
     gBtn.classList.toggle("active", currentUser === "g");
-
-    if (currentUser) {
-      userStatus.textContent =
-        "Logged in as " + (currentUser === "mass" ? "Mass" : "G");
-      sentBtn.disabled = false;
-      receivedBtn.disabled = false;
-    }
+    userStatus.textContent = currentUser
+      ? "Logged in as " + (currentUser === "mass" ? "Mass" : "G")
+      : "";
   }
 
   massBtn.onclick = () => {
@@ -154,56 +169,94 @@
     renderUser();
   };
 
-  /* ---------- BUTTON ACTIONS ---------- */
-  sentBtn.onclick = async () => {
-    if (!currentUser) return;
+  /* ---------- DAY LOGIC ---------- */
+  function massDayComplete(d) {
+    return d.massSent && d.gReceived;
+  }
 
-    await updateDoc(dayRef,
-      currentUser === "mass"
-        ? { massSent: true }
-        : { gSent: true }
+  function gDayComplete(d) {
+    return d.gSent && d.massReceived;
+  }
+
+  sentBtn.onclick = () => {
+    updateDoc(dayRef, currentUser === "mass"
+      ? { massSent: true }
+      : { gSent: true }
     );
   };
 
-  receivedBtn.onclick = async () => {
-    if (!currentUser) return;
-
-    await updateDoc(dayRef,
-      currentUser === "mass"
-        ? { massReceived: true }
-        : { gReceived: true }
+  receivedBtn.onclick = () => {
+    updateDoc(dayRef, currentUser === "mass"
+      ? { massReceived: true }
+      : { gReceived: true }
     );
   };
 
-  /* ---------- LIVE LISTENER ---------- */
-  function dayComplete(d) {
-    return d.massSent && d.massReceived && d.gSent && d.gReceived;
+  /* ---------- WEEK RENDER ---------- */
+  async function renderWeek() {
+    calendarEl.innerHTML = "";
+    punishmentBox.textContent = "";
+
+    const snap = await getDocs(weekRef);
+    const days = {};
+    snap.forEach(d => days[d.id] = d.data());
+
+    let massCount = 0;
+    let gCount = 0;
+
+    const monday = mondayOfWeek();
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const key = dateKey(d);
+      const data = days[key];
+
+      const massDone = data && massDayComplete(data);
+      const gDone = data && gDayComplete(data);
+
+      if (massDone) massCount++;
+      if (gDone) gCount++;
+
+      const div = document.createElement("div");
+      div.className = "day";
+      div.innerHTML = `
+        ${d.toLocaleDateString("en-GB", { weekday: "short" })}<br>
+        M ${massDone ? "✅" : "❌"}<br>
+        G ${gDone ? "✅" : "❌"}
+      `;
+      calendarEl.appendChild(div);
+    }
+
+    if (massCount < 4 && gCount < 4) {
+      punishmentBox.textContent = "❌ Both missed – both owe £10";
+    } else if (massCount < 4) {
+      punishmentBox.textContent = "❌ Mass missed – owes G £10";
+    } else if (gCount < 4) {
+      punishmentBox.textContent = "❌ G missed – owes Mass £10";
+    } else {
+      punishmentBox.textContent = "✅ Both hit target – no punishment";
+    }
   }
 
-  async function updateWeekCount() {
-    const snap = await getDocs(collection(db, "weeks", WEEK, "days"));
-    let count = 0;
-    snap.forEach(doc => {
-      if (dayComplete(doc.data())) count++;
-    });
-    weekCount.textContent = count;
-  }
-
-  onSnapshot(dayRef, async snap => {
+  /* ---------- LIVE ---------- */
+  onSnapshot(dayRef, snap => {
     const d = snap.data();
-    if (!d) return;
+    if (!d || !currentUser) return;
 
     sentBtn.disabled = currentUser === "mass" ? d.massSent : d.gSent;
     receivedBtn.disabled = currentUser === "mass" ? d.massReceived : d.gReceived;
 
-    todayStatus.textContent = dayComplete(d)
-      ? "✅ Gym day confirmed"
-      : "⏳ Waiting for confirmations";
+    todayStatus.textContent =
+      currentUser === "mass"
+        ? (massDayComplete(d) ? "✅ You’re done for today" : "⏳ Your day not confirmed")
+        : (gDayComplete(d) ? "✅ You’re done for today" : "⏳ Your day not confirmed");
 
-    await updateWeekCount();
+    renderWeek();
   });
 
   renderUser();
+  renderWeek();
 </script>
 </body>
 </html>
