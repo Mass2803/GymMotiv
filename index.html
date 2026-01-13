@@ -1,204 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Quiz 🎉</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gym Motiv</title>
 
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #2c003e, #6a0572);
-    color: white;
-    text-align: center;
-    padding: 20px;
-  }
-
-  .container {
-    max-width: 700px;
-    margin: auto;
-    background: rgba(0,0,0,0.45);
-    border-radius: 15px;
-    padding: 25px;
-  }
-
-  h1 { color: gold; }
-
-  button {
-    background: gold;
-    border: none;
-    padding: 12px 18px;
-    margin: 10px;
-    border-radius: 10px;
-    font-size: 16px;
-    cursor: pointer;
-  }
-
-  button:hover { background: orange; }
-
-  .option {
-    background: #ffffff22;
-    padding: 14px;
-    margin: 10px 0;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 18px;
-  }
-
-  .option:hover { background: #ffffff44; }
-
-  .correct { background: #2ecc71 !important; }
-  .wrong { background: #e74c3c !important; }
-  .hidden { display: none; }
-
-  #score {
-    margin-top: 10px;
-    color: gold;
-    font-weight: bold;
-  }
-</style>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, Arial;
+      background: #0b0f19;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .card {
+      background: #121a2b;
+      padding: 22px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      text-align: center;
+    }
+    h2 { margin-top: 0; }
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: bold;
+      background: #1e2a45;
+      color: white;
+      cursor: pointer;
+    }
+    button.active { background: #1f6b3a; }
+    button:disabled { opacity: .6; }
+    .status {
+      margin-top: 12px;
+      font-size: 14px;
+      opacity: .9;
+    }
+  </style>
 </head>
 
 <body>
+<div class="card">
+  <h2>Gym Motiv 💪</h2>
 
-<div class="container">
-<h1>🍻 Quiz 🍻</h1>
+  <!-- USER SELECT -->
+  <button id="massBtn">I am Mass</button>
+  <button id="gBtn">I am G</button>
+  <div class="status" id="userStatus">Not logged in</div>
 
-<div id="roleSelect">
-  <p>Select your role:</p>
-  <button onclick="setRole('master')">Quiz Master</button>
-  <button onclick="setRole('player')">Quiz Player</button>
+  <!-- ACTIONS -->
+  <button id="sentBtn" disabled>✅ I have sent (I went)</button>
+  <button id="receivedBtn" disabled>✅ I have received (partner went)</button>
+
+  <div class="status" id="todayStatus"></div>
+  <div class="status"><strong>This week:</strong> <span id="weekCount">0</span> / 4</div>
 </div>
 
-<div id="quiz" class="hidden"></div>
-<div id="feedback" class="hidden"></div>
-<div id="score" class="hidden"></div>
-</div>
+<script type="module">
+  console.log("JS loaded ✅");
 
-<script>
-/* ======================
-   90 QUESTIONS
-   ====================== */
-const questions = [
-  {q:"Capital of Australia?",o:["Sydney","Melbourne","Canberra","Perth"],a:2},
-  {q:"Red Planet?",o:["Mars","Venus","Jupiter","Saturn"],a:0},
-  {q:"Players in a football team?",o:["9","10","11","12"],a:2},
-  {q:"Mona Lisa painter?",o:["Van Gogh","Da Vinci","Picasso","Michelangelo"],a:1},
-  {q:"Largest ocean?",o:["Atlantic","Indian","Pacific","Arctic"],a:2},
-  {q:"Statue of Liberty gift from?",o:["UK","France","Italy","Spain"],a:1},
-  {q:"Gold chemical symbol?",o:["Ag","Au","Gd","Go"],a:1},
-  {q:"TV show with Ross & Rachel?",o:["Friends","Seinfeld","Frasier","Office"],a:0},
-  {q:"Hexagon sides?",o:["5","6","7","8"],a:1},
-  {q:"Sport with love & deuce?",o:["Cricket","Tennis","Squash","Badminton"],a:1},
+  /* ---------- FIREBASE IMPORTS ---------- */
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import {
+    getFirestore,
+    doc,
+    setDoc,
+    updateDoc,
+    onSnapshot,
+    collection,
+    getDocs
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-  {q:"First man on the Moon?",o:["Buzz Aldrin","Neil Armstrong","Yuri Gagarin","Collins"],a:1},
-  {q:"WW2 ended?",o:["1943","1944","1945","1946"],a:2},
-  {q:"Abbey Road band?",o:["Queen","Oasis","Beatles","Stones"],a:2},
-  {q:"Tallest mountain?",o:["K2","Everest","Mont Blanc","Kilimanjaro"],a:1},
-  {q:"Currency of Japan?",o:["Yuan","Won","Yen","Dollar"],a:2},
-  {q:"Atomic number 1?",o:["Oxygen","Hydrogen","Helium","Carbon"],a:1},
-  {q:"2018 World Cup winners?",o:["Brazil","France","Germany","Argentina"],a:1},
-  {q:"Guacamole ingredient?",o:["Avocado","Pea","Spinach","Cucumber"],a:0},
-  {q:"Big Apple city?",o:["LA","Chicago","NYC","Boston"],a:2},
-  {q:"WWW stands for?",o:["World Web Wide","World Wide Web","Wide Web World","Web Wide World"],a:1},
+  /* ---------- FIREBASE CONFIG ---------- */
+  const firebaseConfig = {
+    apiKey: "AIzaSyC2XOpkk8J5GgXPphkrJyFXrcgYwta_Dg4",
+    authDomain: "gymmotiv-e58d6.firebaseapp.com",
+    projectId: "gymmotiv-e58d6",
+    storageBucket: "gymmotiv-e58d6.firebasestorage.app",
+    messagingSenderId: "36078583703",
+    appId: "1:36078583703:web:0a1f12cc58df9048514ed2"
+  };
 
-  {q:"Largest land mammal?",o:["Hippo","Rhino","Elephant","Giraffe"],a:2},
-  {q:"Hardest natural substance?",o:["Iron","Diamond","Gold","Quartz"],a:1},
-  {q:"Most native speakers?",o:["English","Spanish","Mandarin","Hindi"],a:2},
-  {q:"Olympic rings count?",o:["4","5","6","7"],a:1},
-  {q:"Gas plants absorb?",o:["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],a:2},
-  {q:"Harry Potter author?",o:["Tolkien","Rowling","Dahl","King"],a:1},
-  {q:"Capital of Spain?",o:["Barcelona","Madrid","Seville","Valencia"],a:1},
-  {q:"Instrument with 88 keys?",o:["Harp","Guitar","Piano","Violin"],a:2},
-  {q:"Liquid metal at room temp?",o:["Tin","Mercury","Lead","Zinc"],a:1},
-  {q:"Brazil continent?",o:["Africa","Europe","South America","Asia"],a:2},
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  console.log("Firebase connected ✅");
 
-  {q:"Largest planet?",o:["Earth","Saturn","Jupiter","Neptune"],a:2},
-  {q:"Beer ingredient?",o:["Grapes","Hops","Rice","Apples"],a:1},
-  {q:"London river?",o:["Severn","Thames","Trent","Tyne"],a:1},
-  {q:"Fastest land animal?",o:["Lion","Cheetah","Horse","Leopard"],a:1},
-  {q:"Chess pieces per side?",o:["14","15","16","18"],a:2},
-  {q:"Human bones count?",o:["196","206","216","226"],a:1},
-  {q:"UK PM residence?",o:["Buckingham","10 Downing St","Windsor","Whitehall"],a:1},
-  {q:"Film with Jack & Rose?",o:["Avatar","Titanic","Inception","Jaws"],a:1},
-  {q:"Smallest prime number?",o:["0","1","2","3"],a:2},
-  {q:"Coffee origin?",o:["Brazil","Ethiopia","Colombia","Italy"],a:1},
-
-  {q:"Most visited country?",o:["USA","France","Spain","China"],a:1},
-  {q:"Chemical symbol for Iron?",o:["Ir","Fe","In","Io"],a:1},
-  {q:"Shakespeare birthplace?",o:["London","Oxford","Stratford","Cambridge"],a:2},
-  {q:"Pint size UK?",o:["500ml","568ml","600ml","550ml"],a:1},
-  {q:"Capital of Canada?",o:["Toronto","Vancouver","Ottawa","Montreal"],a:2},
-  {q:"Snooker balls total?",o:["21","22","23","24"],a:1},
-  {q:"Facebook founder?",o:["Musk","Gates","Zuckerberg","Bezos"],a:2},
-  {q:"Fastest bird?",o:["Eagle","Falcon","Hawk","Owl"],a:1},
-  {q:"Euro introduced?",o:["1997","1999","2001","2003"],a:1},
-  {q:"Main gas in air?",o:["Oxygen","Carbon","Nitrogen","Hydrogen"],a:2},
-
-  {q:"Greek god of war?",o:["Zeus","Ares","Apollo","Hades"],a:1},
-  {q:"Largest desert?",o:["Sahara","Gobi","Antarctic","Kalahari"],a:2},
-  {q:"Beatles member count?",o:["3","4","5","6"],a:1},
-  {q:"National animal of UK?",o:["Lion","Horse","Eagle","Stag"],a:0},
-  {q:"Formula 1 laps vary by?",o:["Weather","Track","Tyres","Cars"],a:1},
-  {q:"Longest river?",o:["Amazon","Nile","Yangtze","Mississippi"],a:1},
-  {q:"Cheese from France?",o:["Cheddar","Brie","Gouda","Edam"],a:1},
-  {q:"Capital of Scotland?",o:["Glasgow","Edinburgh","Aberdeen","Dundee"],a:1},
-  {q:"Human blood colour?",o:["Blue","Green","Red","Purple"],a:2},
-  {q:"Planet with rings?",o:["Mars","Saturn","Venus","Mercury"],a:1}
-];
-
-/* ======================
-   QUIZ LOGIC
-   ====================== */
-let role="",current=0,score=0,answered=false;
-
-function setRole(r){
-  role=r;
-  document.getElementById("roleSelect").classList.add("hidden");
-  document.getElementById("score").classList.remove("hidden");
-  loadQ();
-}
-
-function loadQ(){
-  answered=false;
-  const qz=document.getElementById("quiz");
-  const fb=document.getElementById("feedback");
-  qz.classList.remove("hidden");
-  fb.classList.add("hidden");
-  qz.innerHTML="";
-
-  if(current>=questions.length){
-    qz.innerHTML=`<h2>🎉 Finished!</h2><h3>${score}/${questions.length}</h3><button onclick="location.reload()">Play Again</button>`;
-    return;
+  /* ---------- DATE HELPERS ---------- */
+  function todayKey() {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
   }
 
-  const q=questions[current];
-  qz.innerHTML=`<h2>Q${current+1}</h2><h3>${q.q}</h3>`;
+  function weekKey() {
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+    const week1 = new Date(d.getFullYear(),0,4);
+    return d.getFullYear() + "-W" +
+      String(1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay()+6)%7) / 7)).padStart(2,"0");
+  }
 
-  q.o.forEach((opt,i)=>{
-    const d=document.createElement("div");
-    d.className="option";
-    d.innerText=opt;
-    if(role==="player") d.onclick=()=>pick(d,i);
-    if(role==="master"&&i===q.a) d.classList.add("correct");
-    qz.appendChild(d);
+  const WEEK = weekKey();
+  const TODAY = todayKey();
+  const dayRef = doc(db, "weeks", WEEK, "days", TODAY);
+
+  await setDoc(dayRef, {
+    massSent: false,
+    massReceived: false,
+    gSent: false,
+    gReceived: false
+  }, { merge: true });
+
+  /* ---------- UI ---------- */
+  let currentUser = localStorage.getItem("currentUser");
+
+  const massBtn = document.getElementById("massBtn");
+  const gBtn = document.getElementById("gBtn");
+  const sentBtn = document.getElementById("sentBtn");
+  const receivedBtn = document.getElementById("receivedBtn");
+  const userStatus = document.getElementById("userStatus");
+  const todayStatus = document.getElementById("todayStatus");
+  const weekCount = document.getElementById("weekCount");
+
+  function renderUser() {
+    massBtn.classList.toggle("active", currentUser === "mass");
+    gBtn.classList.toggle("active", currentUser === "g");
+
+    if (currentUser) {
+      userStatus.textContent =
+        "Logged in as " + (currentUser === "mass" ? "Mass" : "G");
+      sentBtn.disabled = false;
+      receivedBtn.disabled = false;
+    }
+  }
+
+  massBtn.onclick = () => {
+    currentUser = "mass";
+    localStorage.setItem("currentUser", currentUser);
+    renderUser();
+  };
+
+  gBtn.onclick = () => {
+    currentUser = "g";
+    localStorage.setItem("currentUser", currentUser);
+    renderUser();
+  };
+
+  /* ---------- BUTTON ACTIONS ---------- */
+  sentBtn.onclick = async () => {
+    if (!currentUser) return;
+
+    await updateDoc(dayRef,
+      currentUser === "mass"
+        ? { massSent: true }
+        : { gSent: true }
+    );
+  };
+
+  receivedBtn.onclick = async () => {
+    if (!currentUser) return;
+
+    await updateDoc(dayRef,
+      currentUser === "mass"
+        ? { massReceived: true }
+        : { gReceived: true }
+    );
+  };
+
+  /* ---------- LIVE LISTENER ---------- */
+  function dayComplete(d) {
+    return d.massSent && d.massReceived && d.gSent && d.gReceived;
+  }
+
+  async function updateWeekCount() {
+    const snap = await getDocs(collection(db, "weeks", WEEK, "days"));
+    let count = 0;
+    snap.forEach(doc => {
+      if (dayComplete(doc.data())) count++;
+    });
+    weekCount.textContent = count;
+  }
+
+  onSnapshot(dayRef, async snap => {
+    const d = snap.data();
+    if (!d) return;
+
+    sentBtn.disabled = currentUser === "mass" ? d.massSent : d.gSent;
+    receivedBtn.disabled = currentUser === "mass" ? d.massReceived : d.gReceived;
+
+    todayStatus.textContent = dayComplete(d)
+      ? "✅ Gym day confirmed"
+      : "⏳ Waiting for confirmations";
+
+    await updateWeekCount();
   });
 
-  document.getElementById("score").innerText=`Score: ${score}`;
-}
-
-function pick(el,i){
-  if(answered) return;
-  answered=true;
-  const q=questions[current];
-  const fb=document.getElementById("feedback");
-  fb.classList.remove("hidden");
-
-  if(i===q.a){ el.classList.add("correct"); fb.innerHTML="✅ Correct"; score++; }
-  else{ el.classList.add("wrong"); fb.innerHTML="❌ Wrong"; }
-
-  setTimeout(()=>{ current++; loadQ(); },2000);
-}
+  renderUser();
 </script>
-
 </body>
 </html>
