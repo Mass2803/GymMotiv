@@ -53,7 +53,6 @@
       text-align: center;
       font-size: 12px;
     }
-    .done { background: #1f6b3a; }
     .punishment {
       margin-top: 12px;
       padding: 10px;
@@ -87,8 +86,14 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
   import {
-    getFirestore, doc, setDoc, updateDoc,
-    collection, getDocs, onSnapshot
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc,
+    updateDoc,
+    collection,
+    getDocs,
+    onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
   /* ---------- FIREBASE ---------- */
@@ -127,15 +132,19 @@
 
   const WEEK = isoWeekKey();
   const TODAY = dateKey(new Date());
-  const weekRef = collection(db, "weeks", WEEK, "days");
   const dayRef = doc(db, "weeks", WEEK, "days", TODAY);
+  const weekRef = collection(db, "weeks", WEEK, "days");
 
-  await setDoc(dayRef, {
-    massSent: false,
-    massReceived: false,
-    gSent: false,
-    gReceived: false
-  }, { merge: true });
+  /* ---------- SAFE DAY INITIALISE ---------- */
+  const existing = await getDoc(dayRef);
+  if (!existing.exists()) {
+    await setDoc(dayRef, {
+      massSent: false,
+      massReceived: false,
+      gSent: false,
+      gReceived: false
+    });
+  }
 
   /* ---------- USER ---------- */
   let currentUser = localStorage.getItem("currentUser");
@@ -192,7 +201,7 @@
     );
   };
 
-  /* ---------- WEEK RENDER ---------- */
+  /* ---------- WEEK ---------- */
   async function renderWeek() {
     calendarEl.innerHTML = "";
     punishmentBox.textContent = "";
@@ -203,7 +212,6 @@
 
     let massCount = 0;
     let gCount = 0;
-
     const monday = mondayOfWeek();
 
     for (let i = 0; i < 7; i++) {
@@ -228,15 +236,14 @@
       calendarEl.appendChild(div);
     }
 
-    if (massCount < 4 && gCount < 4) {
+    if (massCount < 4 && gCount < 4)
       punishmentBox.textContent = "❌ Both missed – both owe £10";
-    } else if (massCount < 4) {
+    else if (massCount < 4)
       punishmentBox.textContent = "❌ Mass missed – owes G £10";
-    } else if (gCount < 4) {
+    else if (gCount < 4)
       punishmentBox.textContent = "❌ G missed – owes Mass £10";
-    } else {
+    else
       punishmentBox.textContent = "✅ Both hit target – no punishment";
-    }
   }
 
   /* ---------- LIVE ---------- */
